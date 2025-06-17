@@ -279,6 +279,27 @@ if not trades.empty:
         st.metric("Total Volume", f"{trades['qty'].sum():.1f} {base_asset}")
     
     st.success(f"Successfully fetched {len(trades):,} {selected_symbol} trades from {start_time} to {end_time}")
+    
+    # Add download buttons
+    st.subheader("📥 Download Data")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Download raw trades data
+        trades_csv = trades.to_csv(index=False)
+        st.download_button(
+            label="📊 Download Raw Trades Data (CSV)",
+            data=trades_csv,
+            file_name=f"{selected_symbol}_trades_{start_time.strftime('%Y%m%d_%H%M')}_to_{end_time.strftime('%Y%m%d_%H%M')}.csv",
+            mime="text/csv",
+            help="Download the raw trade-by-trade data"
+        )
+    
+    with col2:
+        # Preview trades data
+        if st.button("👁️ Preview Raw Trades Data"):
+            st.write("**Sample of Raw Trades Data:**")
+            st.dataframe(trades.head(10), use_container_width=True)
 else:
     st.error("No trades were fetched.")
     st.stop()
@@ -863,6 +884,47 @@ for name, bars in bars_dict.items():
 
 st.dataframe(pd.DataFrame(stats_data), use_container_width=True)
 
+# Add download buttons for bar data
+st.subheader("📥 Download Bar Data")
+download_cols = st.columns(len(bars_dict))
+
+for i, (name, bars) in enumerate(bars_dict.items()):
+    with download_cols[i]:
+        if len(bars) > 0:
+            bars_csv = bars.to_csv(index=False)
+            st.download_button(
+                label=f"📈 {name} Bars",
+                data=bars_csv,
+                file_name=f"{selected_symbol}_{name.lower()}_bars_{start_time.strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv",
+                help=f"Download {name} bars data ({len(bars)} bars)"
+            )
+        else:
+            st.write(f"No {name} bars")
+
+# Option to download all bars in one file
+if any(len(bars) > 0 for bars in bars_dict.values()):
+    with st.expander("📦 Download All Bar Types Combined"):
+        # Combine all bar types into one DataFrame
+        combined_bars = []
+        for bar_type, bars in bars_dict.items():
+            if len(bars) > 0:
+                bars_with_type = bars.copy()
+                bars_with_type['bar_type'] = bar_type
+                combined_bars.append(bars_with_type)
+        
+        if combined_bars:
+            all_bars_df = pd.concat(combined_bars, ignore_index=True)
+            all_bars_csv = all_bars_df.to_csv(index=False)
+            
+            st.download_button(
+                label="📦 Download All Bar Types (Combined CSV)",
+                data=all_bars_csv,
+                file_name=f"{selected_symbol}_all_bars_{start_time.strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv",
+                help="Download all bar types in a single CSV file with bar_type column"
+            )
+
 # Display charts
 st.header("Candlestick Charts")
 for name, bars in bars_dict.items():
@@ -888,6 +950,16 @@ for name, bars in bars_dict.items():
             # Show recent bars
             with st.expander(f"Recent {name} Bars Data"):
                 st.dataframe(bars.tail(10).round(4))
+                
+                # Add individual download button for this bar type
+                bars_csv = bars.to_csv(index=False)
+                st.download_button(
+                    label=f"📊 Download {name} Bars CSV",
+                    data=bars_csv,
+                    file_name=f"{selected_symbol}_{name.lower()}_bars_detailed_{bars['time'].min().strftime('%Y%m%d_%H%M')}.csv",
+                    mime="text/csv",
+                    key=f"download_{name}_bars_detailed"
+                )
                 
         except Exception as e:
             st.error(f"Error plotting {name} bars: {e}")
@@ -1056,6 +1128,17 @@ if enable_predictions:
                     
                     styled_df = comparison_df.round(4).style.apply(highlight_best_performance)
                     st.dataframe(styled_df, use_container_width=True)
+                    
+                    # Add download button for prediction results
+                    st.subheader("📥 Download Prediction Results")
+                    prediction_csv = comparison_df.to_csv(index=False)
+                    st.download_button(
+                        label="📊 Download Model Comparison Results (CSV)",
+                        data=prediction_csv,
+                        file_name=f"{selected_symbol}_prediction_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv",
+                        help="Download complete model performance comparison"
+                    )
                     
                     # Best performing combinations
                     st.subheader("🏆 Top Performers")
